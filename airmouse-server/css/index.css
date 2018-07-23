@@ -1,0 +1,8 @@
+body {
+    margin-top: 10px;
+}
+
+#device-id-container {
+    display: none;
+    margin-left: 10px;
+}
