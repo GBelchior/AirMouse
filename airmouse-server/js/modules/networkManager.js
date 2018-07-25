@@ -1,7 +1,8 @@
 const dgram = require('dgram')
 const net = require('net')
-const EventEmitter = require('events')
 const os = require('os')
+const EventEmitter = require('events')
+const ServerBroadcastDTO = require('./dto/serverBroadcastDTO')
 
 const serverPort = 23111
 const serverPortUDP = 23112
@@ -18,6 +19,11 @@ module.exports = class NetworkManager extends EventEmitter {
 
     set isConnected(value) {
         this.connected = value
+
+        if (value) {
+            stopBroadcasting(this)
+        }
+
         this.emit('connectionChanged', this.connected)
     }
 
@@ -25,32 +31,36 @@ module.exports = class NetworkManager extends EventEmitter {
         return os.hostname()
     }
 
+    get clientAddress() {
+        if (!this.isConnected) return '';
+        return this.tcpSocket.remoteAddress + ':' + this.tcpSocket.remotePort
+    }
+
     constructor() {
         super()
 
-        this.tcpServer = net.createServer(socket => onConnection(this, socket))
-        this.udpSocket = dgram.createSocket('udp4')
+        this.running = false
 
-        this.udpSocket.on('listening', () => this.udpSocket.setBroadcast(true))
-        this.udpSocket.on('message', (msg, rinfo) => onUDPMessage(this, msg, rinfo))
+        this.tcpServer = net.createServer(socket => onConnection(this, socket))
+        this.udpSocket = dgram.createSocket('udp4', (msg, rinfo) => onUDPMessage(this, msg, rinfo))
+        this.udpSocket.bind(serverPortUDP, () => this.udpSocket.setBroadcast(true))
+        this.serverBroadcastMessage = new ServerBroadcastDTO(this.machineName).toString()
     }
 
     start() {
         this.tcpServer.listen(serverPort, '0.0.0.0')
-
-        this.intervalHandle = setInterval(() => {
-            this.udpSocket.send(JSON.stringify({
-                serverAddresses: getMachineAddresses(),
-                serverPort: serverPort
-            }), serverPortUDP, '0.0.0.0')
-        }, 2000)
-
+        startBroadcasting(this)
         this.running = true
     }
 
     stop() {
+        if (this.isConnected) {
+            this.tcpSocket.end()
+            this.tcpSocket.destroy()
+        }
+
         this.tcpServer.close()
-        clearInterval(this.intervalHandle)
+        stopBroadcasting(this)
         this.running = false
     }
 }
@@ -73,9 +83,7 @@ function onConnection(self, clientSocket) {
 }
 
 function onTCPData(socket, data) {
-    socket.write(JSON.stringify({
-        OK: true
-    }), 'utf8');
+    socket.write('OK', 'utf8');
 }
 
 function onTCPClose(self) {
@@ -84,9 +92,7 @@ function onTCPClose(self) {
 }
 
 function onUDPMessage(self, message, rinfo) {
-    let currentClientAddress = self.tcpSocket.address()
-
-    if (!self.isConnected || rinfo.address !== currentClientAddress.address || rinfo.port !== currentClientAddress.port) {
+    if (!self.isConnected || rinfo.address !== self.tcpSocket.remoteAddress) {
         return
     }
 
@@ -95,13 +101,12 @@ function onUDPMessage(self, message, rinfo) {
     self.emit('dataReceived', msgObj)
 }
 
-function getMachineAddresses() {
-    let addresses = []
+function startBroadcasting(self) {
+    self.intervalHandle = setInterval(() => {
+        self.udpSocket.send(self.serverBroadcastMessage, serverPortUDP, '255.255.255.255')
+    }, 1000)
+}
 
-    for (const iface in os.networkInterfaces()) {
-        if (iface.internal || iface.family !== 'IPv4') return
-        addresses.push(iface.address)
-    }
-
-    return addresses
+function stopBroadcasting(self) {
+    clearInterval(self.intervalHandle)
 }

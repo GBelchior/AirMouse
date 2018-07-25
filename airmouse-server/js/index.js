@@ -11,10 +11,15 @@ $(() => {
     netManager.on('dataReceived', d => inputProcessor.processInput(d))
     netManager.on('connectionChanged', (isConnected) => {
         if (isConnected) {
-            $('body').css('background-color', 'green')
+            $('#connected-device-id').text(netManager.clientAddress)
+            $('#connected-device-container').show()
+            $('#device-id-container').hide()
         }
         else {
-            $('body').css('background-color', '')
+            $('#connected-device-container').hide()
+            if (netManager.running) {
+                $('#device-id-container').show()
+            }
         }
     })
 })

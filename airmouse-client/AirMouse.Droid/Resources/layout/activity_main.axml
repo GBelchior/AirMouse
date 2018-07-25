@@ -1,32 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.design.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
-    <android.support.design.widget.AppBarLayout
+    android:layout_height="match_parent"
+    android:minWidth="25px"
+    android:minHeight="25px"
+    android:id="@+id/mainRelativeLayout">
+    <TextView
+        android:text="Not connected"
+        android:textAppearance="?android:attr/textAppearanceLarge"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:theme="@style/AppTheme.AppBarOverlay">
-
-        <android.support.v7.widget.Toolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            app:popupTheme="@style/AppTheme.PopupOverlay" />
-
-    </android.support.design.widget.AppBarLayout>
-
-    <include layout="@layout/content_main" />
-
-    <android.support.design.widget.FloatingActionButton
-        android:id="@+id/fab"
-        android:layout_width="wrap_content"
+        android:textAlignment="center"
+        android:id="@+id/txtConnection" />
+    <LinearLayout
+        android:orientation="vertical"
+        android:minWidth="25px"
+        android:minHeight="25px"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="@dimen/fab_margin"
-        app:srcCompat="@android:drawable/ic_dialog_email" />
-
-</android.support.design.widget.CoordinatorLayout>
+        android:layout_below="@id/txtConnection"
+        android:id="@+id/linearLayout1">
+        <TextView
+            android:text="Sensitivity"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/textView1"
+            android:layout_marginLeft="10px" />
+        <SeekBar
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="60px"
+            android:max="500"
+            android:id="@+id/seekBarSensitivity" />
+    </LinearLayout>
+    <ListView
+        android:minWidth="25px"
+        android:minHeight="100px"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/linearLayout1"
+        android:id="@+id/lvwDevices"
+        android:layout_above="@+id/tableLayout1" />
+    <TableLayout
+        android:minWidth="25px"
+        android:minHeight="25px"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:id="@+id/tableLayout1">
+        <TableRow
+            android:id="@+id/tableRow1">
+            <Button
+                android:text="Left"
+                android:layout_width="0px"
+                android:layout_height="match_parent"
+                android:layout_weight=".5"
+                android:layout_alignParentLeft="true"
+                android:layout_toLeftOf="@+id/btnRight"
+                android:id="@+id/btnLeft" />
+            <Button
+                android:text="Right"
+                android:layout_width="0px"
+                android:layout_height="match_parent"
+                android:layout_weight=".5"
+                android:layout_alignParentRight="true"
+                android:layout_toRightOf="@+id/btnLeft"
+                android:id="@+id/btnRight" />
+        </TableRow>
+    </TableLayout>
+</RelativeLayout>

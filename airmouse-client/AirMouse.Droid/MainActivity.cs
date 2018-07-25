@@ -1,52 +1,137 @@
-﻿using System;
-using Android.App;
+﻿using Android.App;
 using Android.Widget;
 using Android.OS;
-using Android.Support.Design.Widget;
 using Android.Support.V7.App;
+using AirMouse.Shared.Core;
+using Android.Support.Design.Widget;
+using AirMouse.Shared.Models;
 using Android.Views;
+using Android.Hardware;
+using Android.Runtime;
+using AirMouse.Shared.DTO;
+using Java.Lang;
 
 namespace AirMouse.Droid
 {
-    [Activity(Label = "@string/app_name", Theme = "@style/AppTheme.NoActionBar", MainLauncher = true)]
-    public class MainActivity : AppCompatActivity
+    [Activity(Label = "@string/app_name", Theme = "@style/AppTheme", MainLauncher = true)]
+    public class MainActivity : AppCompatActivity, ISensorEventListener
     {
+        private NetworkManager networkManager;
+        private ArrayAdapter<ServerInfo> arrayAdapter;
+
+        private SensorManager sensorManager;
+        private Sensor gyroscope;
+
+        private SeekBar seekBarSensitivity;
+        private Button btnLeft;
+        private Button btnRight;
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
 
+            // Set our view from the "main" layout resource
             SetContentView(Resource.Layout.activity_main);
 
-            Android.Support.V7.Widget.Toolbar toolbar = FindViewById<Android.Support.V7.Widget.Toolbar>(Resource.Id.toolbar);
-            SetSupportActionBar(toolbar);
+            sensorManager = (SensorManager)GetSystemService(SensorService);
+            gyroscope = sensorManager.GetDefaultSensor(SensorType.Gyroscope);
+            sensorManager.RegisterListener(this, gyroscope, SensorDelay.Ui);
 
-            FloatingActionButton fab = FindViewById<FloatingActionButton>(Resource.Id.fab);
-            fab.Click += FabOnClick;
+            seekBarSensitivity = FindViewById<SeekBar>(Resource.Id.seekBarSensitivity);
+            btnLeft = FindViewById<Button>(Resource.Id.btnLeft);
+            btnRight = FindViewById<Button>(Resource.Id.btnRight);
+
+            networkManager = new NetworkManager();
+            networkManager.ServerListUpdated += NetworkManager_ServerListUpdated;
+            networkManager.ConnectionChanged += NetworkManager_ConnectionChanged;
+
+            ListView listView = FindViewById<ListView>(Resource.Id.lvwDevices);
+            arrayAdapter = new ArrayAdapter<ServerInfo>(this, Android.Resource.Layout.SimpleListItem1);
+            listView.Adapter = arrayAdapter;
+            listView.ItemClick += lvwDevices_ItemClick;
+
+            networkManager.Start();
         }
 
-        public override bool OnCreateOptionsMenu(IMenu menu)
+        private void NetworkManager_ConnectionChanged(object sender, System.EventArgs e)
         {
-            MenuInflater.Inflate(Resource.Menu.menu_main, menu);
-            return true;
-        }
-
-        public override bool OnOptionsItemSelected(IMenuItem item)
-        {
-            int id = item.ItemId;
-            if (id == Resource.Id.action_settings)
+            RunOnUiThread(() =>
             {
-                return true;
+                TextView connectionStatus = FindViewById<TextView>(Resource.Id.txtConnection);
+
+                if (networkManager.Connected)
+                {
+                    arrayAdapter.Clear();
+                    arrayAdapter.NotifyDataSetChanged();
+
+                    connectionStatus.Text = $"Connected to {networkManager.CurrentConnectedServer}";
+                }
+                else
+                {
+                    connectionStatus.Text = "Not connected";
+                    networkManager.Start();
+                }
+            });
+        }
+
+        private void NetworkManager_ServerListUpdated(object sender, System.EventArgs e)
+        {
+            RunOnUiThread(() =>
+            {
+                arrayAdapter.Clear();
+                arrayAdapter.AddAll(networkManager.CurrentServers);
+                arrayAdapter.NotifyDataSetChanged();
+            });
+        }
+
+        private void lvwDevices_ItemClick(object sender, AdapterView.ItemClickEventArgs e)
+        {
+            ServerInfo clickedServer = networkManager.CurrentServers[e.Position];
+            networkManager.Connect(clickedServer);
+        }
+
+        public void OnAccuracyChanged(Sensor sensor, [GeneratedEnum] SensorStatus accuracy)
+        {
+
+        }
+
+        public void OnSensorChanged(SensorEvent e)
+        {
+            if (!networkManager.Connected) return;
+            if (e.Sensor.Type != SensorType.Gyroscope) return;
+
+            float normalizedX = -e.Values[2];
+            float normalizedY = -e.Values[0];
+            if (Math.Abs(normalizedX) < 0.01) normalizedX = 0;
+            if (Math.Abs(normalizedY) < 0.01) normalizedY = 0;
+
+            normalizedX *= seekBarSensitivity.Progress;
+            normalizedY *= seekBarSensitivity.Progress;
+
+            ClientInputDTO clientInput = new ClientInputDTO
+            {
+                MouseRelativeX = normalizedX,
+                MouseRelativeY = normalizedY,
+
+                MouseLeftButtonPressed = btnLeft.Pressed,
+                MouseRightButtonPressed = btnRight.Pressed
+            };
+
+            networkManager.Send(clientInput);
+        }
+
+        public override void OnWindowFocusChanged(bool hasFocus)
+        {
+            if (!hasFocus)
+            {
+                sensorManager.UnregisterListener(this);
+            }
+            else
+            {
+                sensorManager.RegisterListener(this, gyroscope, SensorDelay.Ui);
             }
 
-            return base.OnOptionsItemSelected(item);
-        }
-
-        private void FabOnClick(object sender, EventArgs eventArgs)
-        {
-            View view = (View) sender;
-            Snackbar.Make(view, "Replace with your own action", Snackbar.LengthLong)
-                .SetAction("Action", (Android.Views.View.IOnClickListener)null).Show();
+            base.OnWindowFocusChanged(hasFocus);
         }
     }
 }
